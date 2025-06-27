@@ -1,0 +1,54 @@
+name: CI/CD - Run tests and deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tests:
+    name: Lancer les tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Lancer les services nécessaires
+        run: |
+          docker compose up -d
+          sleep 10  # attendre que le serveur soit up (tu peux adapter)
+
+      - name: Installer les dépendances
+        run: |
+          pip install -r requirements.txt
+
+      - name: Lancer les tests
+        run: |
+          for file in test/*.py; do
+            echo "⏳ Test de $file"
+            python "$file"
+          done
+
+  deploy:
+    name: Déployer sur le VPS
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Connect to VPS and deploy
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.IP }}
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.PASSWORD }}
+          script: |
+            cd work/ap
+            git pull
+            docker compose down
+            docker compose up -d --build
