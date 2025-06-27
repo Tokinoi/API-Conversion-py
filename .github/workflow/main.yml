@@ -1,0 +1,36 @@
+name: Get modified files (push)
+on:
+  push:
+    branches:
+      - recette
+
+jobs:
+  get_files:
+    name: Get modified files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+
+      - name: Get changed files
+        run: |
+          files=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }})
+          directories=$(files | awk -F/ '{print $1}' | sort | uniq)
+          echo "files=$files" >> $GITHUB_ENV
+          echo "directories=$directories" >> $GITHUB_ENV
+
+      - name: Fait passer les test
+        run: | 
+
+      - name: Connect to VPS and deploy app
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.IP }}
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.PASSWORD }}
+          script: |
+            cd work/api
+            git pull 
+            docker compose up
