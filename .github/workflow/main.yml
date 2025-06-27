@@ -1,36 +1,54 @@
-name: Get modified files (push)
+name: CI/CD - Run tests and deploy
+
 on:
   push:
     branches:
-      - recette
+      - main
 
 jobs:
-  get_files:
-    name: Get modified files
+  tests:
+    name: Lancer les tests
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          fetch-depth: 2
+          python-version: '3.10'
 
-      - name: Get changed files
+      - name: Lancer les services nécessaires
         run: |
-          files=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }})
-          directories=$(files | awk -F/ '{print $1}' | sort | uniq)
-          echo "files=$files" >> $GITHUB_ENV
-          echo "directories=$directories" >> $GITHUB_ENV
+          docker compose up -d
+          sleep 10  # attendre que le serveur soit up (tu peux adapter)
 
-      - name: Fait passer les test
-        run: | 
+      - name: Installer les dépendances
+        run: |
+          pip install -r requirements.txt
 
-      - name: Connect to VPS and deploy app
+      - name: Lancer les tests
+        run: |
+          for file in test/*.py; do
+            echo "⏳ Test de $file"
+            python "$file"
+          done
+
+  deploy:
+    name: Déployer sur le VPS
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Connect to VPS and deploy
         uses: appleboy/ssh-action@v0.1.8
         with:
           host: ${{ secrets.IP }}
           username: ${{ secrets.USER }}
           password: ${{ secrets.PASSWORD }}
           script: |
-            cd work/api
-            git pull 
-            docker compose up
+            cd work/ap
+            git pull
+            docker compose down
+            docker compose up -d --build
